@@ -1,0 +1,28 @@
+# joop2 정적 SPA 배포용 Caddyfile
+# 사용법:
+#   1) 서버에서 빌드:  npm ci && npm run build   (→ dist/ 생성)
+#   2) dist 를 아래 root 경로로 옮기거나 경로 수정
+#   3) caddy run --config ./Caddyfile   (또는 systemd 서비스로)
+#
+# 주의: VITE_KAKAO_MAP_KEY 는 "빌드 시점"에 주입됩니다.
+#       빌드 전에 .env 를 만들어 두세요 (VITE_KAKAO_MAP_KEY=발급키).
+#       그리고 아래 도메인을 Kakao 콘솔의 JavaScript SDK 도메인에 등록해야 지도가 뜹니다.
+
+your-domain.com {
+	# 빌드 결과물 경로
+	root * /var/www/joop2/dist
+
+	encode gzip
+
+	# SPA 라우팅: 실제 파일 없으면 index.html 로 폴백 (새로고침 404 방지)
+	try_files {path} /index.html
+	file_server
+}
+
+# 도메인 없이 IP로만 임시 테스트하려면 위 블록 대신 아래처럼 (HTTPS 없음):
+# :80 {
+# 	root * /var/www/joop2/dist
+# 	encode gzip
+# 	try_files {path} /index.html
+# 	file_server
+# }
