@@ -9,6 +9,7 @@ export interface Report {
   id: string
   title: string
   description: string
+  address?: string
   category: ReportCategory
   status: ReportStatus
   lat: number

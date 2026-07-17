@@ -28,11 +28,23 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     headers: { 'Content-Type': 'application/json', ...(options?.headers ?? {}) },
     ...options,
   })
+  const responseText = res.status === 204 ? '' : await res.text()
+
   if (!res.ok) {
-    throw new Error(`API ${res.status} ${res.statusText} (${path})`)
+    let detail = responseText
+    try {
+      const parsed = JSON.parse(responseText) as { detail?: unknown }
+      detail = JSON.stringify(parsed.detail ?? parsed)
+    } catch {
+      // JSON이 아닌 오류 응답은 원문을 사용합니다.
+    }
+    throw new Error(
+      `API ${res.status} ${res.statusText} (${path})${detail ? `: ${detail}` : ''}`,
+    )
   }
-  // 204 No Content 대응
-  return (res.status === 204 ? undefined : await res.json()) as T
+
+  // 204 또는 빈 응답 대응
+  return (responseText ? JSON.parse(responseText) : undefined) as T
 }
 
 export const api = {

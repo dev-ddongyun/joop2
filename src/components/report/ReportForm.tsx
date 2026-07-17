@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { IconMapPin, IconEdit, IconCamera, IconX } from '@tabler/icons-react'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { REPORT_REWARD } from '../../types'
 import type { NewReportInput } from '../../store/reportsStore'
+import { reverseGeocode } from '../../lib/reverseGeocode'
 
 interface ReportFormProps {
   open: boolean
@@ -16,11 +17,43 @@ interface ReportFormProps {
 
 export function ReportForm({ open, coord, onClose, onSubmit, onRepick }: ReportFormProps) {
   const [title, setTitle] = useState('')
+  const [address, setAddress] = useState('')
+  const [addressLoading, setAddressLoading] = useState(false)
+  const [addressError, setAddressError] = useState<string | null>(null)
   const [description, setDescription] = useState('')
   const [photo, setPhoto] = useState('') // 업로드한 사진 data URL
 
+  useEffect(() => {
+    if (!open || !coord) return
+
+    let canceled = false
+    setAddress('')
+    setAddressLoading(true)
+    setAddressError(null)
+
+    reverseGeocode(coord)
+      .then((result) => {
+        if (!canceled) setAddress(result)
+      })
+      .catch((error: unknown) => {
+        if (canceled) return
+        const message = error instanceof Error ? error.message : '주소 자동 입력에 실패했습니다.'
+        setAddressError(message)
+      })
+      .finally(() => {
+        if (!canceled) setAddressLoading(false)
+      })
+
+    return () => {
+      canceled = true
+    }
+  }, [open, coord])
+
   const reset = () => {
     setTitle('')
+    setAddress('')
+    setAddressLoading(false)
+    setAddressError(null)
     setDescription('')
     setPhoto('')
   }
@@ -39,17 +72,19 @@ export function ReportForm({ open, coord, onClose, onSubmit, onRepick }: ReportF
     e.target.value = '' // 같은 파일 재선택 허용
   }
 
-  const canSubmit = title.trim().length > 0 && coord !== null && photo !== ''
+  const canSubmit =
+    title.trim().length > 0 && address.trim().length > 0 && coord !== null && photo !== ''
 
   const handleSubmit = () => {
     if (!canSubmit || !coord) return
     onSubmit({
       title: title.trim(),
+      address: address.trim(),
       description: description.trim(),
       category: 'litter', // 단일 카테고리 (쓰레기 무단투기)
       lat: coord.lat,
       lng: coord.lng,
-      photoUrl: photo || undefined,
+      photoUrl: photo,
     })
     reset()
   }
@@ -93,6 +128,25 @@ export function ReportForm({ open, coord, onClose, onSubmit, onRepick }: ReportF
           </span>
         </button>
 
+        {/* 주소 */}
+        <label className="flex flex-col gap-1">
+          <span className="text-sm font-medium text-neutral-700">주소</span>
+          <input
+            value={address}
+            onChange={(e) => {
+              setAddress(e.target.value)
+              setAddressError(null)
+            }}
+            placeholder={
+              addressLoading ? '선택한 위치의 주소를 찾는 중…' : '예: 충북 청주시 상당구 성안로 1'
+            }
+            className="border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-esg-600"
+          />
+          {addressError && (
+            <span className="text-xs text-red-600">{addressError} 직접 입력해주세요.</span>
+          )}
+        </label>
+
         {/* 제목 */}
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium text-neutral-700">제목</span>
@@ -116,9 +170,9 @@ export function ReportForm({ open, coord, onClose, onSubmit, onRepick }: ReportF
           />
         </label>
 
-        {/* 사진 업로드 (선택) */}
+        {/* 사진 업로드 */}
         <div className="flex flex-col gap-1">
-          <span className="text-sm font-medium text-neutral-700">사진</span>
+          <span className="text-sm font-medium text-neutral-700">사진 (필수)</span>
           {photo ? (
             <div className="relative">
               <img
